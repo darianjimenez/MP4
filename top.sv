@@ -11,14 +11,14 @@ module top (
 
     initial begin
         // Read from memory initialization file
-        // readmemh
+        // readmemh into IMEM memory of memory module
     end
 
     // Instantiate variables for inter-module connections
     logic[31:0] pc;
     logic[31:0] instruction;
+    logic[6:0] opcode;
 
-    
     // Instantiate memory module
     memory #(
         .IMEM_INIT_FILE_PREFIX  ("rv32i_test") // consider new file
@@ -73,6 +73,7 @@ module top (
 
     /*  --<>-- FSM for main processor loop --<>--  */
     always_ff @(posedge clk) begin
+
         // state transitions
 
 
@@ -81,31 +82,37 @@ module top (
             // do we want this to advance pc (pc = pc+4)
             // then advance to decode
         
+        
         // Decode
             // no module, just look at first 7 bits to determine opcode -> which execute substate to go to
             // and also process funct3, rs1, rs2, rd
 
+            // store the opcode in a 7 bit register
+            // turn on a flag saying our next state should be execute
+
         // Execute
             // lots of sub-steps based on decoded instruction type
+            // switch statement on opcode register
+                // R-type
+                    // parse: rs1 rs2 rd
+                // I-type
 
-            // R-type
-            
-            // I-type
+                // J-type
+                    // jal, jalr
+                    
+                // S-type (store)
+                    // sw, sb, sh
 
-            // J-type
+                // U-type
+                
+                // B-type
+        
             
-            // S-type
-
-            // U-type
-            
-            // B-type
-            
-            
-        // Store / Complete
-            // write to registers
-            // depending on op-code will be coming from different execute substate variables
-            // should be writing to register_file[rd]
-            // cycle back to fetch
+            // Complete
+                // write to registers
+                // depending on op-code will be coming from different execute substate variables
+                // should be writing to register_file[rd]
+                // cycle back to fetch
         
     end
 
