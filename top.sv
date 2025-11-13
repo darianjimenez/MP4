@@ -89,12 +89,13 @@ module top (
 
             // store the opcode in a 7 bit register
             // turn on a flag saying our next state should be execute
-
+            opcode = instruction[6:0];
         // Execute
             // lots of sub-steps based on decoded instruction type
             // switch statement on opcode register
                 // R-type
                     // parse: rs1 rs2 rd
+                    // add, sub, and, or, xor, sll, srl, sra, slt, sltu
                 // I-type
 
                 // J-type
