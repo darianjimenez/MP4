@@ -1,0 +1,8 @@
+# 32 bits per line of hexadecimal
+# readmemh
+
+add rd rs1 rs2
+
+02
+12
+3E
