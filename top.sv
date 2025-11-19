@@ -132,8 +132,21 @@ module top (
                             alu_op <= funct3;
                             // parse: rs1 rs2 rd
                             // add, sub, and, or, xor, sll, srl, sra, slt, sltu
-                        // I-type
+                        end
 
+                        // I-type
+                        7'b0000011: begin
+                            // Load instructions: LB, LH, LW, LBU, LHU.
+                        
+                        end
+                        7'b0010011: begin
+                            // Integer register-immediate operations: addi, ori, andi, xori, slli, srli, srai, slti, sltiu
+                            // determined by funct3 and funct7
+                        end
+                        7'b1100111: begin
+                            // jalr
+                        
+                        
                         // J-type
                             // jal, jalr
                             
