@@ -147,7 +147,7 @@ module top (
                             // jalr
                         
                         
-                        // J-type
+                        // J-type @darianjimenez
                             // jal, jalr
                             
                         // S-type (store)
