@@ -1,24 +1,19 @@
-filename = top
-pcf_file = iceBlinkPico.pcf
-SRC_DIR = src
-SIM_DIR = sim
+# Simulation target
+sim: compile
+	vvp top_tb
 
-# Simulation targets
-sim: $(SIM_DIR)/testbench.sv $(SRC_DIR)/$(filename).sv
-	iverilog -g2012 -I $(SRC_DIR) -o $(filename)_sim $(SIM_DIR)/testbench.sv
-	vvp $(filename)_sim
-	gtkwave top.vcd
+# Compile all Verilog files
+compile:
+	iverilog -g2012 -o top_tb top_tb.sv top.sv memory.sv alu.sv register_file.sv imm_gen.sv
 
-# Synthesis targets
-build: $(SRC_DIR)/$(filename).sv
-	yosys -p "synth_ice40 -top $(filename) -json $(filename).json" $(SRC_DIR)/$(filename).sv
-	nextpnr-ice40 --up5k --package sg48 --json $(filename).json --pcf $(pcf_file) --asc $(filename).asc
-	icepack $(filename).asc $(filename).bin
-
-prog:
-	dfu-util --device 1d50:6146 --alt 0 -D $(filename).bin -R
-
+# Clean build artifacts (Windows compatible)
 clean:
-	rm -rf $(filename).json $(filename).asc $(filename).bin $(filename)_sim top.vcd
+	-del top_tb.exe 2>nul
+	-del *.vcd 2>nul
+	-del *.fst 2>nul
 
-.PHONY: sim build prog clean
+# Run simulation and display results
+run: sim
+	@echo === Simulation Complete ===
+
+.PHONY: sim compile clean run
