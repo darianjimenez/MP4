@@ -1,88 +1,95 @@
-`include "memory.sv"
-
 module top (
-    input logic clk, 
+    input logic clk, reset,
     output logic LED, // remove LED later
     output logic RGB_R, 
     output logic RGB_G, 
     output logic RGB_B
 );
-    localparam IDLE = 2'b00;
-    localparam FETCH = 2'b01;
-    localparam DECODE = 2'b10;
-    localparam EXECUTE = 2'b11;
+    localparam IDLE = 3'b000;
+    localparam FETCH = 3'b001;
+    localparam DECODE = 3'b010;
+    localparam EXECUTE = 3'b011;
+    localparam MEMORY = 3'b100;
+    localparam WRITEBACK = 3'b101;
+    logic[2:0] state;
 
-    // Instantiate variables for inter-module connections
-    logic[31:0] pc, pc_next; // Leave pc next for now, not sure if final implementation
+    // pc management
+    logic[31:0] pc, next_pc;
+    logic pc_update; //flag for branch target instead of pc+4
+    logic[31:0] branch_target;
+
+    //instruction management
     logic[31:0] instruction_reg;
-
-    logic[6:0] opcode;
+    logic[6:0] opcode, funct7;
     logic[2:0] funct3;
-    logic[4:0] rs1in;
-    logic[4:0] rs2in;
-    logic[4:0] rdin;
+
+    //register file management
+    logic[4:0] rs1in, rs2in, rdin;
+    logic[31:0] rs1out, rs2out, dmem_data_in;
     
-
-    logic[1:0] state = IDLE; // could start with IDLE state
+    //ALU control signals
+    logic[1:0] alu_src_a, alu_src_b;
+    logic[2:0] alu_op;
     
-    
-    logic [31:0] alu_in1;
-    logic [31:0] alu_in2;
-    logic [31:0] alu_out;
-    logic alu_zero;
-    logic alu_lt;
-    logic alu_ltu;
+    //memory control signals
+    logic reg_write, dmem_wren;
 
+    logic[31:0] imm_out;
 
-    assign rs1in = 
+    //ALU dataflow
+    logic[31:0] alu_in1, alu_in2, dmem_address;
+    logic alu_zero, alu_lt, alu_ltu;
 
+    //write data
+    logic[31:0] write_data;
 
+    //memory interface
+    logic[31:0] imem_data_out;
+    logic[31:0] dmem_data_out;
     
     // Instantiate memory module
     memory #(
         .IMEM_INIT_FILE_PREFIX  ("rv32i_test") // consider new file
     ) mem (
         .clk            (clk), 
-        .funct3         (funct3), 
+        //instruction memory - read only
+        .imem_address   (pc), 
+        .imem_data_out  (imem_data_out), 
+        //data memory - read/write
         .dmem_wren      (dmem_wren), 
         .dmem_address   (dmem_address), 
         .dmem_data_in   (dmem_data_in), 
-        .imem_address   (pc), 
-        .imem_data_out  (imem_data_out), 
         .dmem_data_out  (dmem_data_out), 
-        .reset          (reset), 
-        .led            (led), 
-        .red            (red), 
-        .green          (green), 
-        .blue           (blue)
+        .funct3         (funct3), 
+        .led            (LED), 
+        .red            (RGB_R), 
+        .green          (RGB_G), 
+        .blue           (RGB_B)
     );
 
     // Instantiate register file @darianjimenez
-    register_file #(
-        
-    ) rf (
+    register_file rf (
         .clk        (clk),
-        .wren       (regfile_wren),
-        .rs1in      (rs1in),
+        .rs1in      (rs1in), // read data
         .rs2in      (rs2in),
+        .rs1out     (rs1out),
+        .rs2out     (rs2out),
         .rdin       (rdin), // write data
-        .data_addr   (data_addr), // <-- clarify
-        .rs1out     (rs1out), // read data1
-        .rs2out     (rs2out), // read data2
-        .rdout      (rdout)
+        .wren       (reg_write),
+        .rd_data_in (write_data)
     );
+
+    assign dmem_data_in = rs2out;
 
     // Instantiate ALU @TaneKoh
     alu u1 (
-        .clk         (clk), 
         .alu_op      (alu_op), 
         .alu_in1     (alu_in1), 
         .alu_in2     (alu_in2), 
-        .alu_out     (alu_out),
-        .zero        (alu__zero),
+        .alu_out     (dmem_address),
+        .zero        (alu_zero),
         .less_than   (alu_lt),
         .less_than_unsigned (alu_ltu)
-        
     );
 
     // Instantiate Immediate Generator @eddydpan
@@ -91,86 +98,169 @@ module top (
         .imm_out        (imm_out)
     );
 
+    // alu input selection 1 - for fetch/decode, use pc, for execute use rs1out
+    assign alu_in1 = (alu_src_a == 2'b00) ? pc :
+                 (alu_src_a == 2'b01) ? rs1out :
+                 32'b0;
+
+    // alu input selection 2 -dmem_data_in used for r-type instructions
+    // immediate used for i-type
+    // 10 = 4 used for pc+4
+    assign alu_in2 = (alu_src_b == 2'b00) ? dmem_data_in :
+                    (alu_src_b == 2'b01) ? imm_out :
+                    (alu_src_b == 2'b10) ? 32'd4 :
+                    32'b0;
+
     /*  --<>-- FSM for main processor loop --<>--  */
     always_ff @(posedge clk) begin
-        if (reset) state <= IDLE;
-        alu_op <= 3'b000;
-        // state transitions
-        case (state) begin
-            IDLE begin // used if holding reset not perform any operations
-                state = FETCH; // blocking assignment
-            end
-            FETCH begin
-                // Fetch
+        if (reset) begin
+            state <= IDLE;
+            alu_op <= 3'b000;
+        end else begin
+            // FSM
+            case (state)
+                IDLE: begin // used if holding reset not perform any operations
+                    state <= FETCH; // blocking assignment
+                end
+                FETCH: begin
+                    instruction_reg <= imem_data_out; // reading instructions from memory (read from text files)
+                    alu_src_a <= 2'b00;
+                    alu_src_b <= 2'b10;
+                    alu_op <= 3'b000; // for pc+4
+                    pc_update <= 1'b1;
+                    state <= DECODE; // transition to DECODE on next clk cycle
+                end
+                DECODE: begin
+                    // Decode
+                    next_pc <= dmem_address;
+                    opcode <= instruction_reg[6:0]; // what kind of instruction
+                    funct3 <= instruction_reg[14:12]; 
+                    rs1in <= instruction_reg[19:15]; // which registers to read
+                    rs2in <= instruction_reg[24:20];
+                    rdin <= instruction_reg[11:7]; // which register to write to
+                    funct7 <= instruction_reg[31:25];
+
+
+                    alu_src_a <= 2'b00;  // Use PC (from fetch)
+                    alu_src_b <= 2'b01;  // Use immediate
+                    alu_op <= 3'b000;    // ADD
+                    branch_target <= pc + imm_out;
+                    state <= EXECUTE; // transition to EXECUTE on next clk cycle
+                end
                 
-                // read from memory - imem_read, instruction register from imem_data_out
-                instruction_reg = imem_data_out; // little or big endian?
-                // store from instruction
-                // read from instruction_memory
-                // either implement pc+4 with next_pc type or implement individually in execute states
-                state = DECODE; // transition to DECODE on next clk cycle
-            end
-            DECODE begin
-                // Decode
-                // no module, just look at first 7 bits to determine opcode -> which execute substate to go to
-                // and also process funct3, rs1, rs2, rd
-
-                // store the opcode in a 7 bit register
-                // turn on a flag saying our next state should be execute
-                opcode = instruction_reg[6:0];
-                funct3 = instruction_reg[14:12]; // funct3 decoded or funct3?
-                state = EXECUTE; // transition to EXECUTE on next clk cycle
-            end
-            EXECUTE begin
-                // Execute state
-                case (opcode) begin
-                    // lots of sub-steps based on decoded instruction type
-                    // switch statement on opcode register
-                        7'b0110011: begin //R-type
-                            alu_src_a <= 2'b01; //rs1
-                            alu_src_b <= 2'b02; //rs2
-                            alu_op <= funct3;
-                            // parse: rs1 rs2 rd
-                            // add, sub, and, or, xor, sll, srl, sra, slt, sltu
-                        end
-
-                        // I-type
-                        7'b0000011: begin
-                            // Load instructions: LB, LH, LW, LBU, LHU.
-                        
-                        end
-                        7'b0010011: begin
-                            // Integer register-immediate operations: addi, ori, andi, xori, slli, srli, srai, slti, sltiu
-                            // determined by funct3 and funct7
-                        end
-                        7'b1100111: begin
-                            // jalr
-                        
-                        
-                        // J-type @darianjimenez
-                            // jal, jalr
-                            
-                        // S-type (store)
-                            // sw, sb, sh
-
-                        // U-type
-                        
-                        // B-type
-        
-            
-            // Complete
-                // write to registers
-                // depending on op-code will be coming from different execute substate variables
-                // should be writing to register_file[rd]
-                // cycle back to fetch
-
+                EXECUTE: begin
+                    // Execute state
+                    case(opcode)
+                    //r-type
+                    7'b0110011: begin
+                        alu_src_a <= 2'b01;  // Use rs1out
+                        alu_src_b <= 2'b00;  // Use dmem_data_in
+                        case (funct3)
+                            3'b000: alu_op <= (funct7[5]) ? 3'b001 : 3'b000; // ADD/SUB
+                            3'b001: alu_op <= 3'b101; // SLL
+                            3'b010: alu_op <= 3'b010; // SLT
+                            3'b011: alu_op <= 3'b011; // SLTU
+                            3'b100: alu_op <= 3'b100; // XOR
+                            3'b101: alu_op <= (funct7[5]) ? 3'b111 : 3'b110; // SRL/SRA
+                            3'b110: alu_op <= 3'b101; // OR
+                            3'b111: alu_op <= 3'b110; // AND
+                        endcase
+                        // dmem_address = rs1 op rs2
+                    end
+                    //i-type
+                    7'b0010011: begin
+                        alu_src_a <= 2'b01;  // Use rs1out
+                        alu_src_b <= 2'b01;  // Use immediate
+                        alu_op <= funct3;    // Most map directly
+                        // dmem_address = rs1 op immediate
+                    end
+                    //load/store
+                    7'b0000011, 7'b0100011: begin
+                        alu_src_a <= 2'b01;  // Use rs1out (base address)
+                        alu_src_b <= 2'b01;  // Use immediate (offset)
+                        alu_op <= 3'b000;    // ADD
+                        // dmem_address = rs1 + immediate (memory address)
+                    end
+                    //branch
+                    7'b1100011: begin
+                        alu_src_a <= 2'b01;  // Use rs1out
+                        alu_src_b <= 2'b00;  // Use dmem_data_in
+                        alu_op <= 3'b001;    // SUBTRACT
+                        // dmem_address = rs1 - rs2 (for comparison)
+                        // alu_zero flag determines branch
+                    end
+                    //JAL
+                    7'b1101111: begin
+                        alu_src_a <= 2'b00;  // Use PC
+                        alu_src_b <= 2'b10;  // Use constant 4
+                        alu_op <= 3'b000;    // ADD
+                        // dmem_address = PC + 4 (return address)
+                    end
+                    endcase
+                    state <= MEMORY;
                 end
 
-                state = FETCH; // transition back to FETCH on next clk cycle
-            end
-        endcase
+                MEMORY: begin
+                    // read/write memory or update PC for branches/jumps
+                    case(opcode)
+                        //load
+                        7'b0000011: begin
+                            dmem_wren <= 1'b0; // read from memory - write disabled
+                            // dmem_data_out = memory[dmem_address]
+                        end
+                        //store
+                        7'b0100011: begin
+                            dmem_wren <= 1'b1; // write to memory
+                            // memory[dmem_address] <= dmem_data_in
+                        end
+                        //branch - update PC
+                        7'b1100011: begin
+                            unique case (funct3)
+                                3'b000: pc_update <= alu_zero;     // BEQ
+                                3'b001: pc_update <= !alu_zero;    // BNE
+                                3'b100: pc_update <= alu_lt;       // BLT
+                                3'b101: pc_update <= !alu_lt;      // BGE
+                                3'b110: pc_update <= alu_ltu;      // BLTU
+                                3'b111: pc_update <= !alu_ltu;     // BGEU
+                            endcase
+                            if (pc_update) next_pc <= branch_target;
+                        end
+                        //JAL - update PC to jump target
+                        7'b1101111: begin
+                            pc_update <= 1'b1;
+                            next_pc <= pc + imm_out; // Jump target
+                        end
+                    endcase
+                    state <= WRITEBACK;
+                end
+                WRITEBACK: begin
+                    case(opcode)
+                        //r-type, i-type
+                        7'b0110011, 7'b0010011: begin
+                            reg_write <= 1'b1; // enable register write
+                            write_data <= dmem_address; // write alu result to register
+                        end
+
+                        //load - write mem data
+                        7'b0000011: begin
+                            reg_write <= 1'b1;
+                            write_data <= dmem_data_out;
+                        end
+
+                        //jal - write return adress
+                        7'b1101111: begin
+                            reg_write <= 1'b1;
+                            write_data <= dmem_address;  // PC + 4 from EXECUTE stage
+                        end
+                    endcase
+                    if (next_pc === 32'bx) begin
+                        pc <= pc + 4;  // Fallback if next_pc is unknown
+                    end else begin
+                        pc <= next_pc;
+                    end
+                    state <= FETCH; // transition back to FETCH on next clk cycle
+                end
+            endcase
+        end
     end
 endmodule
-
-
-
