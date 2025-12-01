@@ -20,8 +20,9 @@ module top (
 
     //instruction management
     logic[31:0] instruction_reg;
-    logic[6:0] opcode, funct7;
-    logic[2:0] funct3;
+    logic[6:0]  opcode, funct7;
+    logic[2:0]  funct3;
+    logic       is_jalr;
 
     //register file management
     logic[4:0] rs1in, rs2in, rdin;
@@ -140,6 +141,7 @@ module top (
                     rdin <= instruction_reg[11:7]; // which register to write to
                     funct7 <= instruction_reg[31:25];
 
+                    is_jalr <= (instruction_reg[6:0] == 7'b1100111);
 
                     alu_src_a <= 2'b00;  // Use PC (from fetch)
                     alu_src_b <= 2'b01;  // Use immediate
@@ -196,6 +198,11 @@ module top (
                         alu_op <= 3'b000;    // ADD
                         // dmem_address = PC + 4 (return address)
                     end
+                    7'b1100111: begin // JALR
+                        alu_src_a <= 2'b01;  // Use rs1out
+                        alu_src_b <= 2'b01;  // Use immediate
+                        alu_op <= 3'b000;    // ADD
+                        // dmem_address = rs1 + immediate (jump target)
                     endcase
                     state <= MEMORY;
                 end
@@ -230,6 +237,11 @@ module top (
                             pc_update <= 1'b1;
                             next_pc <= pc + imm_out; // Jump target
                         end
+                        //JALR - update PC to jump target
+                        7'b1100111: begin
+                            pc_update <= 1'b1;
+                            next_pc <= (dmem_address & ~32'hFFFFFFFE); // Jump target (LSB = 0)
+                        end
                     endcase
                     state <= WRITEBACK;
                 end
@@ -249,6 +261,12 @@ module top (
 
                         //jal - write return adress
                         7'b1101111: begin
+                            reg_write <= 1'b1;
+                            write_data <= dmem_address;  // PC + 4 from EXECUTE stage
+                        end
+
+                        //jalr - write return address
+                        7'b1100111: begin
                             reg_write <= 1'b1;
                             write_data <= dmem_address;  // PC + 4 from EXECUTE stage
                         end
