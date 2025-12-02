@@ -121,7 +121,7 @@ module top (
             // FSM
             case (state)
                 IDLE: begin // used if holding reset not perform any operations
-                    state <= FETCH; // blocking assignment
+                    state <= FETCH;
                 end
 
                 FETCH: begin
@@ -159,28 +159,39 @@ module top (
                     //r-type
                     7'b0110011: begin
                         alu_src_a <= 2'b01;  // Use rs1out
-                        alu_src_b <= 2'b00;  // Use dmem_data_in
+                        alu_src_b <= 2'b00;  // Use rs2out (via dmem_data_in)
                         case (funct3)
                             3'b000: alu_op <= (funct7[5]) ? 3'b001 : 3'b000; // ADD/SUB
                             3'b001: alu_op <= 3'b101; // SLL
-                            3'b010: alu_op <= 3'b010; // SLT
-                            3'b011: alu_op <= 3'b011; // SLTU
+                            3'b010: alu_op <= 3'b001; // SLT (use SUB, check less_than flag)
+                            3'b011: alu_op <= 3'b001; // SLTU (use SUB, check less_than_unsigned flag)
                             3'b100: alu_op <= 3'b100; // XOR
                             3'b101: alu_op <= (funct7[5]) ? 3'b111 : 3'b110; // SRL/SRA
-                            3'b110: alu_op <= 3'b101; // OR
-                            3'b111: alu_op <= 3'b110; // AND
+                            3'b110: alu_op <= 3'b011; // OR
+                            3'b111: alu_op <= 3'b010; // AND
                         endcase
                         // dmem_address = rs1 op rs2
                     end
                     // i-type
                     7'b0010011: begin
+                        // addi, ori, andi, xori, slli, srli, srai, slti, sltiu
                         alu_src_a <= 2'b01;  // Use rs1out
                         alu_src_b <= 2'b01;  // Use immediate
-                        alu_op <= funct3;    // Most map directly
+                        case (funct3)
+                            3'b000: alu_op <= 3'b000; // ADDI (no SUB for I-type)
+                            3'b001: alu_op <= 3'b101; // SLLI
+                            3'b010: alu_op <= 3'b001; // SLTI (use SUB, check less_than flag)
+                            3'b011: alu_op <= 3'b001; // SLTIU (use SUB, check less_than_unsigned flag)
+                            3'b100: alu_op <= 3'b100; // XORI
+                            3'b101: alu_op <= (instruction_reg[30]) ? 3'b111 : 3'b110; // SRLI/SRAI (bit 30 distinguishes)
+                            3'b110: alu_op <= 3'b011; // ORI
+                            3'b111: alu_op <= 3'b010; // ANDI
+                        endcase
                         // dmem_address = rs1 op immediate
                     end
                     // load i-type / store (s-type)
                     7'b0000011, 7'b0100011: begin
+                        // LB, LH, LW, LBU, LHU
                         alu_src_a <= 2'b01;  // Use rs1out (base address)
                         alu_src_b <= 2'b01;  // Use immediate (offset)
                         alu_op <= 3'b000;    // ADD
@@ -267,16 +278,34 @@ module top (
                 end
                 WRITEBACK: begin
                     case(opcode)
-                        // r-type, i-type ALU
-                        7'b0110011, 7'b0010011: begin
+                        //r-type
+                        7'b0110011: begin
                             reg_write <= 1'b1; // enable register write
-                            write_data <= dmem_address; // write alu result to register
+                            // Handle SLT/SLTU specially - write comparison result
+                            if (funct3 == 3'b010) // SLT
+                                write_data <= {31'b0, alu_lt}; // 1 if less than (signed), 0 otherwise
+                            else if (funct3 == 3'b011) // SLTU
+                                write_data <= {31'b0, alu_ltu}; // 1 if less than (unsigned), 0 otherwise
+                            else
+                                write_data <= dmem_address; // write alu result to register
+                        end
+                        
+                        //i-type ALU
+                        7'b0010011: begin
+                            reg_write <= 1'b1; // enable register write
+                            // Handle SLTI/SLTIU specially - write comparison result
+                            if (funct3 == 3'b010) // SLTI
+                                write_data <= {31'b0, alu_lt}; // 1 if less than (signed), 0 otherwise
+                            else if (funct3 == 3'b011) // SLTIU
+                                write_data <= {31'b0, alu_ltu}; // 1 if less than (unsigned), 0 otherwise
+                            else
+                                write_data <= dmem_address; // write alu result to register
                         end
 
-                        //load - write mem data
+                        //load - write mem data into register
                         7'b0000011: begin
                             reg_write <= 1'b1;
-                            write_data <= dmem_data_out;
+                            write_data <= dmem_data_out; // data from memory
                         end
 
                         //jal - write return address (PC + 4)
