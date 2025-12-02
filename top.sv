@@ -15,7 +15,7 @@ module top (
 
     // pc management
     logic[31:0] pc, next_pc;
-    logic pc_update; //flag for branch target instead of pc+4
+    logic       pc_update; //flag for branch target instead of pc+4
     logic[31:0] branch_target;
 
     //instruction management
@@ -123,6 +123,7 @@ module top (
                 IDLE: begin // used if holding reset not perform any operations
                     state <= FETCH; // blocking assignment
                 end
+
                 FETCH: begin
                     instruction_reg <= imem_data_out; // reading instructions from memory (read from text files)
                     alu_src_a <= 2'b00;
@@ -131,21 +132,23 @@ module top (
                     pc_update <= 1'b1;
                     state <= DECODE; // transition to DECODE on next clk cycle
                 end
+
                 DECODE: begin
                     // Decode
                     next_pc <= dmem_address;
-                    opcode <= instruction_reg[6:0]; // what kind of instruction
-                    funct3 <= instruction_reg[14:12]; 
-                    rs1in <= instruction_reg[19:15]; // which registers to read
-                    rs2in <= instruction_reg[24:20];
-                    rdin <= instruction_reg[11:7]; // which register to write to
-                    funct7 <= instruction_reg[31:25];
+                    opcode  <= instruction_reg[6:0]; // what kind of instruction
+                    funct3  <= instruction_reg[14:12]; 
+                    rs1in   <= instruction_reg[19:15]; // which registers to read
+                    rs2in   <= instruction_reg[24:20];
+                    rdin    <= instruction_reg[11:7]; // which register to write to
+                    funct7  <= instruction_reg[31:25];
 
                     is_jalr <= (instruction_reg[6:0] == 7'b1100111);
 
                     alu_src_a <= 2'b00;  // Use PC (from fetch)
                     alu_src_b <= 2'b01;  // Use immediate
                     alu_op <= 3'b000;    // ADD
+
                     branch_target <= pc + imm_out;
                     state <= EXECUTE; // transition to EXECUTE on next clk cycle
                 end
@@ -169,21 +172,21 @@ module top (
                         endcase
                         // dmem_address = rs1 op rs2
                     end
-                    //i-type
+                    // i-type
                     7'b0010011: begin
                         alu_src_a <= 2'b01;  // Use rs1out
                         alu_src_b <= 2'b01;  // Use immediate
                         alu_op <= funct3;    // Most map directly
                         // dmem_address = rs1 op immediate
                     end
-                    //load/store
+                    // load i-type / store (s-type)
                     7'b0000011, 7'b0100011: begin
                         alu_src_a <= 2'b01;  // Use rs1out (base address)
                         alu_src_b <= 2'b01;  // Use immediate (offset)
                         alu_op <= 3'b000;    // ADD
                         // dmem_address = rs1 + immediate (memory address)
                     end
-                    //branch
+                    // branch (B-type)
                     7'b1100011: begin
                         alu_src_a <= 2'b01;  // Use rs1out
                         alu_src_b <= 2'b00;  // Use dmem_data_in
@@ -191,23 +194,40 @@ module top (
                         // dmem_address = rs1 - rs2 (for comparison)
                         // alu_zero flag determines branch
                     end
-                    //JAL
+                    // JAL (J-type)
                     7'b1101111: begin
                         alu_src_a <= 2'b00;  // Use PC
                         alu_src_b <= 2'b10;  // Use constant 4
                         alu_op <= 3'b000;    // ADD
                         // dmem_address = PC + 4 (return address)
                     end
-                    7'b1100111: begin // JALR
+                    // JALR (I-type)
+                    7'b1100111: begin
                         alu_src_a <= 2'b01;  // Use rs1out
                         alu_src_b <= 2'b01;  // Use immediate
                         alu_op <= 3'b000;    // ADD
                         // dmem_address = rs1 + immediate (jump target)
+                    end
+                    // U-type (LUI)
+                    7'b0110111: begin
+                        alu_src_a <= 2'b00;  // Use PC (not used)
+                        alu_src_b <= 2'b01;  // Use immediate
+                        alu_op <= 3'b000;    // ADD (not used)
+                        // dmem_address = immediate (load upper/immediate)
+                    end
+                    // U-type (AUIPC)
+                    7'b0010111: begin
+                        alu_src_a <= 2'b00;  // Use PC
+                        alu_src_b <= 2'b01;  // Use immediate
+                        alu_op <= 3'b000;    // ADD
+                        // dmem_address = PC + immediate
+                    end
                     endcase
                     state <= MEMORY;
                 end
 
                 MEMORY: begin
+                    dmem_wren <= 1'b0; // default to no write (safety)
                     // read/write memory or update PC for branches/jumps
                     case(opcode)
                         //load
@@ -247,7 +267,7 @@ module top (
                 end
                 WRITEBACK: begin
                     case(opcode)
-                        //r-type, i-type
+                        // r-type, i-type ALU
                         7'b0110011, 7'b0010011: begin
                             reg_write <= 1'b1; // enable register write
                             write_data <= dmem_address; // write alu result to register
@@ -259,17 +279,30 @@ module top (
                             write_data <= dmem_data_out;
                         end
 
-                        //jal - write return adress
+                        //jal - write return address (PC + 4)
                         7'b1101111: begin
                             reg_write <= 1'b1;
-                            write_data <= dmem_address;  // PC + 4 from EXECUTE stage
+                            write_data <= pc + 32'd4;  // PC + 4 from EXECUTE stage
                         end
 
-                        //jalr - write return address
+                        //jalr - write return address (PC + 4)
                         7'b1100111: begin
                             reg_write <= 1'b1;
-                            write_data <= dmem_address;  // PC + 4 from EXECUTE stage
+                            write_data <= pc + 32'd4;  // PC + 4 from EXECUTE stage
                         end
+                        
+                        //lui - write immediate
+                        7'b0110111: begin
+                            reg_write <= 1'b1;
+                            write_data <= imm_out;
+                        end
+
+                        //auipc - write pc + immediate
+                        7'b0010111: begin
+                            reg_write <= 1'b1;
+                            write_data <= dmem_address; // alu result from EXECUTE stage
+                        end
+
                     endcase
                     if (next_pc === 32'bx) begin
                         pc <= pc + 4;  // Fallback if next_pc is unknown
