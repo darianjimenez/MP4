@@ -16,4 +16,7 @@ clean:
 run: sim
 	@echo === Simulation Complete ===
 
+wave: sim
+	gtkwave top_tb.vcd top_tb.gtkw &
+
 .PHONY: sim compile clean run
