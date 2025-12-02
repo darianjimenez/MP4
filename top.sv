@@ -167,8 +167,8 @@ module top (
                             3'b011: alu_op <= 3'b001; // SLTU (use SUB, check less_than_unsigned flag)
                             3'b100: alu_op <= 3'b100; // XOR
                             3'b101: alu_op <= (funct7[5]) ? 3'b111 : 3'b110; // SRL/SRA
-                            3'b110: alu_op <= 3'b011; // OR
-                            3'b111: alu_op <= 3'b010; // AND
+                            3'b110: alu_op <= 3'b110; // OR
+                            3'b111: alu_op <= 3'b111; // AND
                         endcase
                         // dmem_address = rs1 op rs2
                     end
