@@ -14,7 +14,8 @@ module top (
     logic[2:0] state;
 
     // pc management
-    logic[31:0] pc, next_pc;
+    logic[31:0] pc;
+    logic[31:0 ]next_pc = 32'bx;
     logic       pc_update; //flag for branch target instead of pc+4
     logic[31:0] branch_target;
 
@@ -129,7 +130,6 @@ module top (
                     alu_src_a <= 2'b00;
                     alu_src_b <= 2'b10;
                     alu_op <= 3'b000; // for pc+4
-                    pc_update <= 1'b1;
                     state <= DECODE; // transition to DECODE on next clk cycle
                 end
 
@@ -144,7 +144,6 @@ module top (
                     funct7  <= instruction_reg[31:25];
 
                     is_jalr <= (instruction_reg[6:0] == 7'b1100111);
-
                     alu_src_a <= 2'b00;  // Use PC (from fetch)
                     alu_src_b <= 2'b01;  // Use immediate
                     alu_op <= 3'b000;    // ADD
@@ -274,6 +273,16 @@ module top (
                             next_pc <= (dmem_address & ~32'hFFFFFFFE); // Jump target (LSB = 0)
                         end
                     endcase
+                    if (pc_update) begin
+                        if (next_pc === 32'bx) begin
+                            pc <= pc + 4;  // Fallback if next_pc is unknown
+                        end else begin
+                            pc <= next_pc; // Use branch/jump target
+                        end
+                        pc_update <= 1'b0; // Clear flag
+                    end else begin
+                        pc <= pc + 4; // Default: next sequential instruction
+                    end
                     state <= WRITEBACK;
                 end
                 WRITEBACK: begin
@@ -311,13 +320,13 @@ module top (
                         //jal - write return address (PC + 4)
                         7'b1101111: begin
                             reg_write <= 1'b1;
-                            write_data <= pc + 32'd4;  // PC + 4 from EXECUTE stage
+                            write_data <= next_pc;  // PC + 4 from EXECUTE stage
                         end
 
                         //jalr - write return address (PC + 4)
                         7'b1100111: begin
                             reg_write <= 1'b1;
-                            write_data <= pc + 32'd4;  // PC + 4 from EXECUTE stage
+                            write_data <= next_pc;  // PC + 4 from EXECUTE stage
                         end
                         
                         //lui - write immediate
@@ -333,14 +342,13 @@ module top (
                         end
 
                     endcase
-                    if (next_pc === 32'bx) begin
-                        pc <= pc + 4;  // Fallback if next_pc is unknown
-                    end else begin
-                        pc <= next_pc;
-                    end
+                    // Update PC here (WRITEBACK) so synchronous instruction memory
+                    // has a full cycle to produce imem_data_out for the next fetch.
+                    
                     state <= FETCH; // transition back to FETCH on next clk cycle
                 end
             endcase
         end
     end
+    // PC is updated in WRITEBACK so synchronous imem has time to produce data
 endmodule

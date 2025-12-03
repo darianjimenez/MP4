@@ -1,0 +1,29 @@
+[*]
+[*] GTKWave Analyzer v3.4.0 (w)1999-2022 BSI
+[*] Wed Dec 03 01:00:47 2025
+[*]
+[dumpfile] "C:\Users\mkoh\Downloads\CompArch\CompArch-MP4\top_tb.vcd"
+[dumpfile_mtime] "Wed Dec 03 00:37:21 2025"
+[dumpfile_size] 1208848
+[savefile] "C:\Users\mkoh\Downloads\CompArch\CompArch-MP4\top_tb.gtkw"
+[timestart] 527500
+[size] 1920 973
+[pos] -91 -88
+*-17.000000 985000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] top_tb.
+[sst_width] 280
+[signals_width] 220
+[sst_expanded] 1
+[sst_vpaned_height] 287
+@24
+top_tb.dut.state[2:0]
+@22
+top_tb.dut.imem_data_out[31:0]
+@29
+top_tb.dut.pc_update
+@22
+top_tb.dut.pc[31:0]
+top_tb.dut.next_pc[31:0]
+top_tb.dut.write_data[31:0]
+[pattern_trace] 1
+[pattern_trace] 0

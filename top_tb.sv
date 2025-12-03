@@ -641,7 +641,6 @@ module top_tb;
         
         // Force PC initialization
         dut.pc = 32'h00001000;
-        dut.next_pc = 32'h00001000;
         
         $display("\n=== Starting RV32I Processor Test ===");
         $display("Initial PC forced to: %h", dut.pc);

@@ -19,4 +19,8 @@ run: sim
 wave: sim
 	gtkwave top_tb.vcd top_tb.gtkw &
 
-.PHONY: sim compile clean run
+# Run simulation and display with custom visual style
+wave-styled: sim
+	gtkwave top_tb.vcd visual_style.gtkw &
+
+.PHONY: sim compile clean run wave wave-styled
