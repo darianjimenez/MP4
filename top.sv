@@ -243,11 +243,13 @@ module top (
                         //load
                         7'b0000011: begin
                             dmem_wren <= 1'b0; // read from memory - write disabled
+                            pc_update <= 1'b1;
                             // dmem_data_out = memory[dmem_address]
                         end
                         //store
                         7'b0100011: begin
                             dmem_wren <= 1'b1; // write to memory
+                            pc_update <= 1'b1;
                             // memory[dmem_address] <= dmem_data_in
                         end
                         //branch - update PC
@@ -269,20 +271,14 @@ module top (
                         end
                         //JALR - update PC to jump target
                         7'b1100111: begin
-                            pc_update <= 1'b1;
+                            pc_update <= 1'b1;     
                             next_pc <= (dmem_address & ~32'hFFFFFFFE); // Jump target (LSB = 0)
                         end
-                    endcase
-                    if (pc_update) begin
-                        if (next_pc === 32'bx) begin
-                            pc <= pc + 4;  // Fallback if next_pc is unknown
-                        end else begin
-                            pc <= next_pc; // Use branch/jump target
+
+                        default: begin
+                            pc_update <= 1'b1;
                         end
-                        pc_update <= 1'b0; // Clear flag
-                    end else begin
-                        pc <= pc + 4; // Default: next sequential instruction
-                    end
+                    endcase
                     state <= WRITEBACK;
                 end
                 WRITEBACK: begin
@@ -345,9 +341,20 @@ module top (
                     // Update PC here (WRITEBACK) so synchronous instruction memory
                     // has a full cycle to produce imem_data_out for the next fetch.
                     
-                    state <= FETCH; // transition back to FETCH on next clk cycle
+                    state <= IDLE; // transition back to FETCH on next clk cycle
                 end
             endcase
+        end
+    end
+
+    always_ff @(posedge clk) begin
+        if (pc_update) begin
+            if (next_pc === 32'bx) begin
+                pc <= pc + 4;  // Fallback if next_pc is unknown
+            end else begin
+                pc <= next_pc; // Use branch/jump target
+            end
+            pc_update <= 1'b0; // Clear flag
         end
     end
     // PC is updated in WRITEBACK so synchronous imem has time to produce data
