@@ -143,12 +143,32 @@ module top (
                     rdin    <= instruction_reg[11:7]; // which register to write to
                     funct7  <= instruction_reg[31:25];
 
-                    is_jalr <= (instruction_reg[6:0] == 7'b1100111);
                     alu_src_a <= 2'b00;  // Use PC (from fetch)
                     alu_src_b <= 2'b01;  // Use immediate
                     alu_op <= 3'b000;    // ADD
-
-                    branch_target <= pc + imm_out;
+                    case (instruction_reg[6:0])
+                        7'b1101111: begin // JAL - J-type immediate
+                            branch_target <= pc + {{12{instruction_reg[31]}}, 
+                                                instruction_reg[19:12], 
+                                                instruction_reg[20], 
+                                                instruction_reg[30:21], 
+                                                1'b0};
+                        end
+                        7'b1100111: begin // JALR - I-type immediate
+                            branch_target <= pc + {{21{instruction_reg[31]}}, 
+                                                instruction_reg[30:20]};
+                        end
+                        7'b1100011: begin // Branches - B-type immediate
+                            branch_target <= pc + {{20{instruction_reg[31]}}, 
+                                                instruction_reg[7], 
+                                                instruction_reg[30:25], 
+                                                instruction_reg[11:8], 
+                                                1'b0};
+                        end
+                        default: begin
+                            branch_target <= pc + 4; // Default
+                        end
+                    endcase
                     state <= EXECUTE; // transition to EXECUTE on next clk cycle
                 end
                 
@@ -267,12 +287,12 @@ module top (
                         //JAL - update PC to jump target
                         7'b1101111: begin
                             pc_update <= 1'b1;
-                            next_pc <= pc + imm_out; // Jump target
+                            next_pc <= branch_target; // Jump target
                         end
                         //JALR - update PC to jump target
                         7'b1100111: begin
                             pc_update <= 1'b1;     
-                            next_pc <= (dmem_address & ~32'hFFFFFFFE); // Jump target (LSB = 0)
+                            next_pc <= (dmem_address & ~32'h00000001); // Jump target (LSB = 0)
                         end
 
                         default: begin
@@ -316,13 +336,13 @@ module top (
                         //jal - write return address (PC + 4)
                         7'b1101111: begin
                             reg_write <= 1'b1;
-                            write_data <= next_pc;  // PC + 4 from EXECUTE stage
+                            write_data <= dmem_address;  // PC + 4 from EXECUTE stage
                         end
 
                         //jalr - write return address (PC + 4)
                         7'b1100111: begin
                             reg_write <= 1'b1;
-                            write_data <= next_pc;  // PC + 4 from EXECUTE stage
+                            write_data <= dmem_address;  // PC + 4 from EXECUTE stage
                         end
                         
                         //lui - write immediate
