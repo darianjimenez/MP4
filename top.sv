@@ -18,6 +18,8 @@ module top (
     logic[31:0 ]next_pc = 32'bx;
     logic       pc_update; //flag for branch target instead of pc+4
     logic[31:0] branch_target;
+    logic       will_branch;
+    logic[31:0] jalr_return;
 
     //instruction management
     logic[31:0] instruction_reg;
@@ -138,14 +140,17 @@ module top (
                     next_pc <= dmem_address;
                     opcode  <= instruction_reg[6:0]; // what kind of instruction
                     funct3  <= instruction_reg[14:12]; 
-                    rs1in   <= instruction_reg[19:15]; // which registers to read
+
+                    // DONT SET THIS FOR A JAL!!!!!!!!!!
+                    rs1in   <= (opcode != 7'b1101111) ?  instruction_reg[19:15] : rs1in; // which registers to read
                     rs2in   <= instruction_reg[24:20];
                     rdin    <= instruction_reg[11:7]; // which register to write to
                     funct7  <= instruction_reg[31:25];
 
-                    alu_src_a <= 2'b00;  // Use PC (from fetch)
-                    alu_src_b <= 2'b01;  // Use immediate
-                    alu_op <= 3'b000;    // ADD
+                    // TODO: validate if we should actually keep this or not
+                    // alu_src_a <= 2'b00;  // Use PC (from fetch)
+                    // alu_src_b <= 2'b01;  // Use immediate
+                    // alu_op <= 3'b000;    // ADD
                     case (instruction_reg[6:0])
                         7'b1101111: begin // JAL - J-type immediate
                             branch_target <= pc + {{12{instruction_reg[31]}}, 
@@ -154,10 +159,12 @@ module top (
                                                 instruction_reg[30:21], 
                                                 1'b0};
                         end
-                        7'b1100111: begin // JALR - I-type immediate
-                            branch_target <= pc + {{21{instruction_reg[31]}}, 
-                                                instruction_reg[30:20]};
-                        end
+                        //TODO: validate that this should be commented out
+
+                        // 7'b1100111: begin // JALR - I-type immediate
+                        //     branch_target <= pc + {{21{instruction_reg[31]}}, 
+                        //                         instruction_reg[30:20]};
+                        // end  
                         7'b1100011: begin // Branches - B-type immediate
                             branch_target <= pc + {{20{instruction_reg[31]}}, 
                                                 instruction_reg[7], 
@@ -233,6 +240,7 @@ module top (
                     end
                     // JALR (I-type)
                     7'b1100111: begin
+                        jalr_return = dmem_address; // PC + 4 (return address)
                         alu_src_a <= 2'b01;  // Use rs1out
                         alu_src_b <= 2'b01;  // Use immediate
                         alu_op <= 3'b000;    // ADD
@@ -275,14 +283,15 @@ module top (
                         //branch - update PC
                         7'b1100011: begin
                             unique case (funct3)
-                                3'b000: pc_update <= alu_zero;     // BEQ
-                                3'b001: pc_update <= !alu_zero;    // BNE
-                                3'b100: pc_update <= alu_lt;       // BLT
-                                3'b101: pc_update <= !alu_lt;      // BGE
-                                3'b110: pc_update <= alu_ltu;      // BLTU
-                                3'b111: pc_update <= !alu_ltu;     // BGEU
+                                3'b000: will_branch <= alu_zero;     // BEQ
+                                3'b001: will_branch <= !alu_zero;    // BNE
+                                3'b100: will_branch <= alu_lt;       // BLT
+                                3'b101: will_branch <= !alu_lt;      // BGE
+                                3'b110: will_branch <= alu_ltu;      // BLTU
+                                3'b111: will_branch <= !alu_ltu;     // BGEU
                             endcase
-                            if (pc_update) next_pc <= branch_target;
+                            if (will_branch) next_pc <= branch_target;
+                            pc_update <= 1'b1;
                         end
                         //JAL - update PC to jump target
                         7'b1101111: begin
@@ -342,7 +351,7 @@ module top (
                         //jalr - write return address (PC + 4)
                         7'b1100111: begin
                             reg_write <= 1'b1;
-                            write_data <= dmem_address;  // PC + 4 from EXECUTE stage
+                            write_data <= jalr_return;  // PC + 4 from EXECUTE stage
                         end
                         
                         //lui - write immediate

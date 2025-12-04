@@ -1,29 +1,48 @@
 [*]
 [*] GTKWave Analyzer v3.4.0 (w)1999-2022 BSI
-[*] Wed Dec 03 01:02:47 2025
+[*] Thu Dec  4 21:54:33 2025
 [*]
-[dumpfile] "C:\Users\mkoh\Downloads\CompArch\CompArch-MP4\top_tb.vcd"
-[dumpfile_mtime] "Wed Dec 03 00:37:21 2025"
-[dumpfile_size] 1208848
-[savefile] "C:\Users\mkoh\Downloads\CompArch\CompArch-MP4\visual_style.gtkw"
-[timestart] 527500
-[size] 1920 973
-[pos] -91 -88
-*-17.000000 985000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[dumpfile] "/home/epan/Github/MP4/top_tb.vcd"
+[dumpfile_mtime] "Thu Dec  4 21:37:14 2025"
+[dumpfile_size] 1686744
+[savefile] "/home/epan/Github/MP4/visual_style.gtkw"
+[timestart] 965600
+[size] 1920 1001
+[pos] -1 -1
+*-15.000000 988200 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] top_tb.
-[sst_width] 280
-[signals_width] 220
+[treeopen] top_tb.dut.
+[sst_width] 297
+[signals_width] 264
 [sst_expanded] 1
-[sst_vpaned_height] 287
+[sst_vpaned_height] 270
 @24
 top_tb.dut.state[2:0]
 @22
 top_tb.dut.imem_data_out[31:0]
-@29
+@20000
+-
+@28
+[color] 1
 top_tb.dut.pc_update
 @22
+[color] 2
 top_tb.dut.pc[31:0]
+[color] 2
 top_tb.dut.next_pc[31:0]
+@20000
+-
+@22
+[color] 7
 top_tb.dut.write_data[31:0]
+@24
+[color] 6
+top_tb.dut.rf.rdin[4:0]
+@20000
+-
+@23
+top_tb.dut.dmem_address[31:0]
+@22
+top_tb.dut.rf.rs1out[31:0]
 [pattern_trace] 1
 [pattern_trace] 0
