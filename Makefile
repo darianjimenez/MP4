@@ -8,9 +8,7 @@ compile:
 
 # Clean build artifacts (Windows compatible)
 clean:
-	-del top_tb.exe 2>nul
-	-del *.vcd 2>nul
-	-del *.fst 2>nul
+	@rm -f top_tb.exe top_tb *.vcd *.fst
 
 # Run simulation and display results
 run: sim
