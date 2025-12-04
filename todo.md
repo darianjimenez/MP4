@@ -1,3 +1,16 @@
+# 12.4.25
+We worked on fixing `jal` and `jalr` today
+We have writeup left to do
+- add simulation screenshots to verify working behavior
+
+
+Look into...
+- Changing the `always_ff` that updates the value of `pc` to be activated on **negedge** instead of *posedge* `clk`.
+- Cleaning up the dead code that has been plaguing our codebase and causing glitches in simulation (though sometimes harmless)
+- Validating `store` instructions are working, as we haven't yet gotten to them
+- Validate the `jal`, `jalr`, and Branch Instructions are working.
+
+
 # 12.1.25
 - Merge together the simulation testing (Tane) + S, B, U instructions (Darian)
 - I-type instructions implementation (Eddy)
