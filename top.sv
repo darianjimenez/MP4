@@ -18,7 +18,6 @@ module top (
     logic[31:0 ]next_pc = 32'bx;
     logic       pc_update; //flag for branch target instead of pc+4
     logic[31:0] branch_target;
-    logic       will_branch;
     logic[31:0] jalr_return;
 
     //instruction management
@@ -125,6 +124,7 @@ module top (
             case (state)
                 IDLE: begin // used if holding reset not perform any operations
                     state <= FETCH;
+                    reg_write <= 1'b0; 
                 end
 
                 FETCH: begin
@@ -142,7 +142,7 @@ module top (
                     funct3  <= instruction_reg[14:12]; 
 
                     // DONT SET THIS FOR A JAL!!!!!!!!!!
-                    rs1in   <= (opcode != 7'b1101111) ?  instruction_reg[19:15] : rs1in; // which registers to read
+                    rs1in   <= (instruction_reg[6:0] != 7'b1101111) ?  instruction_reg[19:15] : rs1in; // which registers to read
                     rs2in   <= instruction_reg[24:20];
                     rdin    <= instruction_reg[11:7]; // which register to write to
                     funct7  <= instruction_reg[31:25];
@@ -161,17 +161,34 @@ module top (
                         end
                         //TODO: validate that this should be commented out
 
-                        // 7'b1100111: begin // JALR - I-type immediate
-                        //     branch_target <= pc + {{21{instruction_reg[31]}}, 
-                        //                         instruction_reg[30:20]};
-                        // end  
+                        7'b1100111: begin // JALR - I-type immediate
+                            branch_target <= pc + {{21{instruction_reg[31]}}, 
+                                                instruction_reg[30:20]};
+                            alu_src_a <= 2'b01;  // Use rs1out
+                            alu_src_b <= 2'b01;
+                        end  
                         7'b1100011: begin // Branches - B-type immediate
+                            alu_src_a <= 2'b01;  // Use rs1out
+                            alu_src_b <= 2'b00;  // Use rs2out
+                            alu_op <= 3'b001;    // SUBTRACT
                             branch_target <= pc + {{20{instruction_reg[31]}}, 
                                                 instruction_reg[7], 
                                                 instruction_reg[30:25], 
                                                 instruction_reg[11:8], 
                                                 1'b0};
                         end
+                        7'b0100011: begin
+                            alu_src_a <= 2'b01;  // Use rs1out (base address)
+                            alu_src_b <= 2'b01;  // Use immediate (offset)
+                            alu_op <= 3'b000; 
+                        end
+
+                        7'b0000011: begin // Loads
+                            alu_src_a <= 2'b01;  // Use rs1out (base address)
+                            alu_src_b <= 2'b01;  // Use immediate (offset)
+                            alu_op <= 3'b000;    // ADD
+                        end
+
                         default: begin
                             branch_target <= pc + 4; // Default
                         end
@@ -225,9 +242,9 @@ module top (
                     end
                     // branch (B-type)
                     7'b1100011: begin
-                        alu_src_a <= 2'b01;  // Use rs1out
-                        alu_src_b <= 2'b00;  // Use dmem_data_in
-                        alu_op <= 3'b001;    // SUBTRACT
+                        // alu_src_a = 2'b01;  // Use rs1out
+                        // alu_src_b = 2'b00;  // Use dmem_data_in
+                        // alu_op = 3'b001;    // SUBTRACT
                         // dmem_address = rs1 - rs2 (for comparison)
                         // alu_zero flag determines branch
                     end
@@ -283,14 +300,13 @@ module top (
                         //branch - update PC
                         7'b1100011: begin
                             unique case (funct3)
-                                3'b000: will_branch <= alu_zero;     // BEQ
-                                3'b001: will_branch <= !alu_zero;    // BNE
-                                3'b100: will_branch <= alu_lt;       // BLT
-                                3'b101: will_branch <= !alu_lt;      // BGE
-                                3'b110: will_branch <= alu_ltu;      // BLTU
-                                3'b111: will_branch <= !alu_ltu;     // BGEU
+                                3'b000: if (alu_zero) next_pc <= branch_target;     // BEQ
+                                3'b001: if (!alu_zero) next_pc <= branch_target;    // BNE
+                                3'b100: if (alu_lt) next_pc <= branch_target;       // BLT
+                                3'b101: if (!alu_lt) next_pc <= branch_target;      // BGE
+                                3'b110: if (alu_ltu) next_pc <= branch_target;      // BLTU
+                                3'b111: if (!alu_ltu) next_pc <= branch_target;     // BGEU
                             endcase
-                            if (will_branch) next_pc <= branch_target;
                             pc_update <= 1'b1;
                         end
                         //JAL - update PC to jump target

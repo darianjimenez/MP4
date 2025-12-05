@@ -1,19 +1,19 @@
 [*]
 [*] GTKWave Analyzer v3.4.0 (w)1999-2022 BSI
-[*] Thu Dec  4 21:54:33 2025
+[*] Fri Dec 05 02:12:41 2025
 [*]
-[dumpfile] "/home/epan/Github/MP4/top_tb.vcd"
-[dumpfile_mtime] "Thu Dec  4 21:37:14 2025"
-[dumpfile_size] 1686744
-[savefile] "/home/epan/Github/MP4/visual_style.gtkw"
-[timestart] 965600
+[dumpfile] "C:\Users\mkoh\Downloads\CompArch\CompArch-MP4\top_tb.vcd"
+[dumpfile_mtime] "Fri Dec 05 02:11:31 2025"
+[dumpfile_size] 1660436
+[savefile] "C:\Users\mkoh\Downloads\CompArch\CompArch-MP4\visual_style.gtkw"
+[timestart] 1291000
 [size] 1920 1001
 [pos] -1 -1
-*-15.000000 988200 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-15.000000 1425000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] top_tb.
 [treeopen] top_tb.dut.
 [sst_width] 297
-[signals_width] 264
+[signals_width] 330
 [sst_expanded] 1
 [sst_vpaned_height] 270
 @24
@@ -40,9 +40,14 @@ top_tb.dut.write_data[31:0]
 top_tb.dut.rf.rdin[4:0]
 @20000
 -
-@23
-top_tb.dut.dmem_address[31:0]
 @22
+top_tb.dut.dmem_address[31:0]
 top_tb.dut.rf.rs1out[31:0]
+@20000
+-
+@28
+top_tb.dut.alu_src_a[1:0]
+@29
+top_tb.dut.alu_src_b[1:0]
 [pattern_trace] 1
 [pattern_trace] 0
