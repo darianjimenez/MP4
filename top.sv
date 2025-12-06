@@ -15,7 +15,7 @@ module top (
 
     // pc management
     logic[31:0] pc;
-    logic[31:0 ]next_pc = 32'bx;
+    logic[31:0] next_pc = 32'bx;
     logic       pc_update; //flag for branch target instead of pc+4
     logic[31:0] branch_target;
     logic[31:0] jalr_return;
