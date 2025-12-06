@@ -141,16 +141,11 @@ module top (
                     opcode  <= instruction_reg[6:0]; // what kind of instruction
                     funct3  <= instruction_reg[14:12]; 
 
-                    // DONT SET THIS FOR A JAL!!!!!!!!!!
-                    rs1in   <= (instruction_reg[6:0] != 7'b1101111) ?  instruction_reg[19:15] : rs1in; // which registers to read
-                    rs2in   <= instruction_reg[24:20];
+                    rs1in   <= (instruction_reg[6:0] != 7'b1101111) ?  instruction_reg[19:15] : rs1in; // Don't set rs1in for JAL
+                    rs2in   <= (instruction_reg[6:0] != 7'b0000011) ? instruction_reg[24:20] : rs2in; // loads dont need rs2, avoid resetting comb logic for dmem_data_in
                     rdin    <= instruction_reg[11:7]; // which register to write to
                     funct7  <= instruction_reg[31:25];
 
-                    // TODO: validate if we should actually keep this or not
-                    // alu_src_a <= 2'b00;  // Use PC (from fetch)
-                    // alu_src_b <= 2'b01;  // Use immediate
-                    // alu_op <= 3'b000;    // ADD
                     case (instruction_reg[6:0])
                         7'b1101111: begin // JAL - J-type immediate
                             branch_target <= pc + {{12{instruction_reg[31]}}, 
@@ -159,8 +154,6 @@ module top (
                                                 instruction_reg[30:21], 
                                                 1'b0};
                         end
-                        //TODO: validate that this should be commented out
-
                         7'b1100111: begin // JALR - I-type immediate
                             branch_target <= pc + {{21{instruction_reg[31]}}, 
                                                 instruction_reg[30:20]};
@@ -177,22 +170,27 @@ module top (
                                                 instruction_reg[11:8], 
                                                 1'b0};
                         end
-                        7'b0100011: begin
-                            alu_src_a <= 2'b01;  // Use rs1out (base address)
-                            alu_src_b <= 2'b01;  // Use immediate (offset)
-                            alu_op <= 3'b000; 
-                        end
-
-                        7'b0000011: begin // Loads
+                        7'b0100011: begin // Stores - S-type immediate
                             alu_src_a <= 2'b01;  // Use rs1out (base address)
                             alu_src_b <= 2'b01;  // Use immediate (offset)
                             alu_op <= 3'b000;    // ADD
+                        end
+
+                        7'b0000011: begin // Loads - I-type immediate
+                            alu_src_a <= 2'b01;  // Use rs1out (base address)
+                            alu_src_b <= 2'b01;  // Use immediate (offset)
+                            alu_op <= 3'b000;    // ADD
+
+                            RGB_R <= 1'b1;
+
+
                         end
 
                         default: begin
                             branch_target <= pc + 4; // Default
                         end
                     endcase
+
                     state <= EXECUTE; // transition to EXECUTE on next clk cycle
                 end
                 
@@ -240,14 +238,7 @@ module top (
                         alu_op <= 3'b000;    // ADD
                         // dmem_address = rs1 + immediate (memory address)
                     end
-                    // branch (B-type)
-                    7'b1100011: begin
-                        // alu_src_a = 2'b01;  // Use rs1out
-                        // alu_src_b = 2'b00;  // Use dmem_data_in
-                        // alu_op = 3'b001;    // SUBTRACT
-                        // dmem_address = rs1 - rs2 (for comparison)
-                        // alu_zero flag determines branch
-                    end
+ 
                     // JAL (J-type)
                     7'b1101111: begin
                         alu_src_a <= 2'b00;  // Use PC
@@ -327,6 +318,7 @@ module top (
                     state <= WRITEBACK;
                 end
                 WRITEBACK: begin
+                    dmem_wren <= 1'b0; // disable data memory write
                     case(opcode)
                         //r-type
                         7'b0110011: begin
