@@ -181,9 +181,6 @@ module top (
                             alu_src_b <= 2'b01;  // Use immediate (offset)
                             alu_op <= 3'b000;    // ADD
 
-                            RGB_R <= 1'b1;
-
-
                         end
 
                         default: begin
