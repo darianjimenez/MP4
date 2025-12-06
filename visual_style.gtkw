@@ -1,0 +1,53 @@
+[*]
+[*] GTKWave Analyzer v3.4.0 (w)1999-2022 BSI
+[*] Fri Dec 05 02:12:41 2025
+[*]
+[dumpfile] "C:\Users\mkoh\Downloads\CompArch\CompArch-MP4\top_tb.vcd"
+[dumpfile_mtime] "Fri Dec 05 02:11:31 2025"
+[dumpfile_size] 1660436
+[savefile] "C:\Users\mkoh\Downloads\CompArch\CompArch-MP4\visual_style.gtkw"
+[timestart] 1291000
+[size] 1920 1001
+[pos] -1 -1
+*-15.000000 1425000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] top_tb.
+[treeopen] top_tb.dut.
+[sst_width] 297
+[signals_width] 330
+[sst_expanded] 1
+[sst_vpaned_height] 270
+@24
+top_tb.dut.state[2:0]
+@22
+top_tb.dut.imem_data_out[31:0]
+@20000
+-
+@28
+[color] 1
+top_tb.dut.pc_update
+@22
+[color] 2
+top_tb.dut.pc[31:0]
+[color] 2
+top_tb.dut.next_pc[31:0]
+@20000
+-
+@22
+[color] 7
+top_tb.dut.write_data[31:0]
+@24
+[color] 6
+top_tb.dut.rf.rdin[4:0]
+@20000
+-
+@22
+top_tb.dut.dmem_address[31:0]
+top_tb.dut.rf.rs1out[31:0]
+@20000
+-
+@28
+top_tb.dut.alu_src_a[1:0]
+@29
+top_tb.dut.alu_src_b[1:0]
+[pattern_trace] 1
+[pattern_trace] 0

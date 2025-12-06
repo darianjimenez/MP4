@@ -8,9 +8,8 @@ compile:
 
 # Clean build artifacts (Windows compatible)
 clean:
-	-del top_tb.exe 2>nul
-	-del *.vcd 2>nul
-	-del *.fst 2>nul
+# 	@rm -f top_tb.exe top_tb *.vcd *.fst
+	del /Q top_tb.exe top_tb *.vcd *.fst 2>nul
 
 # Run simulation and display results
 run: sim
@@ -19,4 +18,8 @@ run: sim
 wave: sim
 	gtkwave top_tb.vcd top_tb.gtkw &
 
-.PHONY: sim compile clean run
+# Run simulation and display with custom visual style
+wave-styled: sim
+	gtkwave top_tb.vcd visual_style.gtkw &
+
+.PHONY: sim compile clean run wave wave-styled
