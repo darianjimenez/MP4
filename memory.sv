@@ -30,6 +30,7 @@ module memory #(
 )(
     input logic     clk, 
     input logic     [2:0] funct3, 
+    input logic     [6:0] opcode,          // Instruction opcode for RGB LED control
     input logic     dmem_wren, 
     input logic     [31:0] dmem_address, 
     input logic     [31:0] dmem_data_in, 
@@ -366,8 +367,9 @@ module memory #(
         end
     end
 
-    // Handle word, half word, and byte writes to the LEDs peripheral register
+    // Combined LED control: memory-mapped writes override instruction-type colors
     always_ff @(posedge clk) begin
+        // Memory-mapped write to LEDs register takes priority
         if (dmem_wren && is_leds) begin
             if (funct3[1]) begin
                 leds <= dmem_data_in;
@@ -386,6 +388,61 @@ module memory #(
                     2'b11: leds[31:24] <= dmem_data_in[7:0];
                 endcase
             end
+        end
+        // Otherwise, automatically set colors based on instruction type
+        else begin
+            case (opcode)
+                7'b0110011: begin // R-type (ADD, SUB, AND, OR, XOR, SLL, SRL, SRA, SLT, SLTU)
+                    leds[23:16] <= 8'hFF; // Red = 255
+                    leds[15:8]  <= 8'h00; // Green = 0
+                    leds[7:0]   <= 8'h00; // Blue = 0
+                end
+                7'b0010011: begin // I-type ALU (ADDI, ANDI, ORI, XORI, SLLI, SRLI, SRAI, SLTI, SLTIU)
+                    leds[23:16] <= 8'hFF; // Red = 255
+                    leds[15:8]  <= 8'hFF; // Green = 255
+                    leds[7:0]   <= 8'h00; // Blue = 0 (Yellow)
+                end
+                7'b0000011: begin // I-type Load (LB, LH, LW, LBU, LHU)
+                    leds[23:16] <= 8'h00; // Red = 0
+                    leds[15:8]  <= 8'hFF; // Green = 255
+                    leds[7:0]   <= 8'hFF; // Blue = 255 (Cyan)
+                end
+                7'b0100011: begin // S-type Store (SB, SH, SW)
+                    leds[23:16] <= 8'hFF; // Red = 255
+                    leds[15:8]  <= 8'h00; // Green = 0
+                    leds[7:0]   <= 8'hFF; // Blue = 255 (Magenta)
+                end
+                7'b1100011: begin // B-type Branch (BEQ, BNE, BLT, BGE, BLTU, BGEU)
+                    leds[23:16] <= 8'h00; // Red = 0
+                    leds[15:8]  <= 8'hFF; // Green = 255
+                    leds[7:0]   <= 8'h00; // Blue = 0 (Green)
+                end
+                7'b1101111: begin // J-type JAL
+                    leds[23:16] <= 8'h00; // Red = 0
+                    leds[15:8]  <= 8'h00; // Green = 0
+                    leds[7:0]   <= 8'hFF; // Blue = 255 (Blue)
+                end
+                7'b1100111: begin // I-type JALR
+                    leds[23:16] <= 8'h80; // Red = 128
+                    leds[15:8]  <= 8'h00; // Green = 0
+                    leds[7:0]   <= 8'hFF; // Blue = 255 (Purple)
+                end
+                7'b0110111: begin // U-type LUI
+                    leds[23:16] <= 8'hFF; // Red = 255
+                    leds[15:8]  <= 8'hA5; // Green = 165
+                    leds[7:0]   <= 8'h00; // Blue = 0 (Orange)
+                end
+                7'b0010111: begin // U-type AUIPC
+                    leds[23:16] <= 8'hFF; // Red = 255
+                    leds[15:8]  <= 8'h80; // Green = 128
+                    leds[7:0]   <= 8'h00; // Blue = 0 (Dark Orange)
+                end
+                default: begin // Unknown/IDLE
+                    leds[23:16] <= 8'h00; // Red = 0
+                    leds[15:8]  <= 8'h00; // Green = 0
+                    leds[7:0]   <= 8'h00; // Blue = 0 (Off)
+                end
+            endcase
         end
     end
 

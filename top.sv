@@ -63,7 +63,8 @@ module top (
         .dmem_address   (dmem_address), 
         .dmem_data_in   (dmem_data_in), 
         .dmem_data_out  (dmem_data_out), 
-        .funct3         (funct3), 
+        .funct3         (funct3),
+        .opcode         (opcode),        // Pass opcode for RGB LED control
         .led            (LED), 
         .red            (RGB_R), 
         .green          (RGB_G), 
