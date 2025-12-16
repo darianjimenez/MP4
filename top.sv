@@ -55,6 +55,7 @@ module top (
     logic mul_done;
     logic is_mul_instruction;
     logic [31:0] mul_write_data; //i dont think acc need this?
+    logic mul_busy;
 
     multiplier mul_unit (
         .clk(clk),
@@ -137,8 +138,14 @@ module top (
         if (reset) begin
             state <= IDLE;
             alu_op <= 3'b000;
+            mul_busy <= 1'b0; 
         end else begin
             // FSM
+            mul_start <= 1'b0;
+            reg_write <= 1'b0;
+            dmem_wren <= 1'b0;
+            pc_update <= 1'b0;
+
             case (state)
                 IDLE: begin // used if holding reset not perform any operations
                     state <= FETCH;
@@ -163,6 +170,9 @@ module top (
                     rs2in   <= (instruction_reg[6:0] != 7'b0000011) ? instruction_reg[24:20] : rs2in; // loads dont need rs2, avoid resetting comb logic for dmem_data_in
                     rdin    <= instruction_reg[11:7]; // which register to write to
                     funct7  <= instruction_reg[31:25];
+
+                    is_mul_instruction <= (instruction_reg[6:0] == 7'b0110011) &&
+                                          (instruction_reg[31:25] == 7'b0000001);
 
                     case (instruction_reg[6:0])
                         7'b1101111: begin // JAL - J-type immediate
@@ -210,24 +220,38 @@ module top (
                 end
                 
                 EXECUTE: begin
+                    state <= MEMORY;
                     // Execute state
                     case(opcode)
                     //r-type
-                    7'b0110011: begin
-                        alu_src_a <= 2'b01;  // Use rs1out
-                        alu_src_b <= 2'b00;  // Use rs2out (via dmem_data_in)
-                        case (funct3)
-                            3'b000: alu_op <= (funct7[5]) ? 3'b001 : 3'b000; // ADD/SUB
-                            3'b001: alu_op <= 3'b101; // SLL
-                            3'b010: alu_op <= 3'b001; // SLT (use SUB, check less_than flag)
-                            3'b011: alu_op <= 3'b001; // SLTU (use SUB, check less_than_unsigned flag)
-                            3'b100: alu_op <= 3'b100; // XOR
-                            3'b101: alu_op <= (funct7[5]) ? 3'b111 : 3'b110; // SRL/SRA
-                            3'b110: alu_op <= 3'b110; // OR
-                            3'b111: alu_op <= 3'b111; // AND
-                        endcase
+                        7'b0110011: begin
+                            if (is_mul_instruction) begin
+                                if (!mul_busy) begin
+                                    mul_start <= 1'b1;
+                                    mul_busy <= 1'b1;
+                                end
+
+                                if (mul_done) begin
+                                    state <= MEMORY;
+                                end else begin
+                                    state <= EXECUTE;
+                                end
+                            end else begin
+                                alu_src_a <= 2'b01;  // Use rs1out
+                                alu_src_b <= 2'b00;  // Use rs2out (via dmem_data_in)
+                                case (funct3)
+                                    3'b000: alu_op <= (funct7[5]) ? 3'b001 : 3'b000; // ADD/SUB
+                                    3'b001: alu_op <= 3'b101; // SLL
+                                    3'b010: alu_op <= 3'b001; // SLT (use SUB, check less_than flag)
+                                    3'b011: alu_op <= 3'b001; // SLTU (use SUB, check less_than_unsigned flag)
+                                    3'b100: alu_op <= 3'b100; // XOR
+                                    3'b101: alu_op <= (funct7[5]) ? 3'b111 : 3'b110; // SRL/SRA
+                                    3'b110: alu_op <= 3'b110; // OR
+                                    3'b111: alu_op <= 3'b111; // AND
+                                endcase
+                            end
+                        end
                         // dmem_address = rs1 op rs2
-                    end
                     // i-type
                     7'b0010011: begin
                         // addi, ori, andi, xori, slli, srli, srai, slti, sltiu
@@ -291,7 +315,6 @@ module top (
                         // dmem_address = PC + immediate
                     end
                     endcase
-                    state <= MEMORY;
                 end
 
                 MEMORY: begin
@@ -341,17 +364,24 @@ module top (
                 end
                 WRITEBACK: begin
                     dmem_wren <= 1'b0; // disable data memory write
+
                     case(opcode)
                         //r-type
                         7'b0110011: begin
                             reg_write <= 1'b1; // enable register write
                             // Handle SLT/SLTU specially - write comparison result
-                            if (funct3 == 3'b010) // SLT
-                                write_data <= {31'b0, alu_lt}; // 1 if less than (signed), 0 otherwise
-                            else if (funct3 == 3'b011) // SLTU
-                                write_data <= {31'b0, alu_ltu}; // 1 if less than (unsigned), 0 otherwise
-                            else
-                                write_data <= dmem_address; // write alu result to register
+
+                            if (is_mul_instruction) begin
+                                write_data <= mul_result;
+                                mul_busy <= 1'b0; // IMPORTANT: allow next multiply to start
+                            end else begin
+                                if (funct3 == 3'b010) // SLT
+                                    write_data <= {31'b0, alu_lt}; // 1 if less than (signed), 0 otherwise
+                                else if (funct3 == 3'b011) // SLTU
+                                    write_data <= {31'b0, alu_ltu}; // 1 if less than (unsigned), 0 otherwise
+                                else
+                                    write_data <= dmem_address; // write alu result to register
+                            end
                         end
                         
                         //i-type ALU
@@ -413,7 +443,6 @@ module top (
             end else begin
                 pc <= next_pc; // Use branch/jump target
             end
-            pc_update <= 1'b0; // Clear flag
         end
     end
     // PC is updated in WRITEBACK so synchronous imem has time to produce data
