@@ -49,6 +49,24 @@ module top (
     //memory interface
     logic[31:0] imem_data_out;
     logic[31:0] dmem_data_out;
+
+    logic mul_start;
+    logic [31:0] mul_result;
+    logic mul_done;
+    logic is_mul_instruction;
+    logic [31:0] mul_write_data; //i dont think acc need this?
+
+    multiplier mul_unit (
+        .clk(clk),
+        .reset(reset),
+        .start(mul_start),
+        .rs1(rs1out),
+        .rs2(rs2out),
+        .funct3(funct3),
+        .result(mul_result),
+        .done(mul_done)
+    );
+
     
     // Instantiate memory module
     memory #(
@@ -228,14 +246,21 @@ module top (
                         // dmem_address = rs1 op immediate
                     end
                     // load i-type / store (s-type)
-                    7'b0000011, 7'b0100011: begin
+                    7'b0000011: begin
                         // LB, LH, LW, LBU, LHU
                         alu_src_a <= 2'b01;  // Use rs1out (base address)
                         alu_src_b <= 2'b01;  // Use immediate (offset)
                         alu_op <= 3'b000;    // ADD
                         // dmem_address = rs1 + immediate (memory address)
                     end
- 
+
+                    // Store s-type
+                    7'b0100011: begin
+                        alu_src_a <= 2'b01;
+                        alu_src_b <= 2'b01;
+                        alu_op <= 3'b000;
+                    end
+
                     // JAL (J-type)
                     7'b1101111: begin
                         alu_src_a <= 2'b00;  // Use PC
@@ -245,7 +270,7 @@ module top (
                     end
                     // JALR (I-type)
                     7'b1100111: begin
-                        jalr_return = dmem_address; // PC + 4 (return address)
+                        jalr_return <= dmem_address; // PC + 4 (return address)
                         alu_src_a <= 2'b01;  // Use rs1out
                         alu_src_b <= 2'b01;  // Use immediate
                         alu_op <= 3'b000;    // ADD

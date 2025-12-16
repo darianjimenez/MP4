@@ -33,6 +33,11 @@
     lhu x21, -4(x0)         # pc = 0x7C, x21 = 0x0000C0C0
     lb x22, -4(x0)          # pc = 0x80, x22 = 0xFFFFFFC0
     lbu x23, -4(x0)         # pc = 0x84, x23 = 0x000000C0
+    
+    mul x26, x24, x25
+    mulh x27, x24, x25
+    mulhu x28, x24, x25
+    mulhsu x29, x25, x24
 
 
 
